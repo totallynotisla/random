@@ -1,21 +1,33 @@
 (async () => {
     const COHERE_KEY = "cohere-token";
+    const HOOK_KEY = "webhook-url";
+
     let token = localStorage.getItem(COHERE_KEY);
     let headers = {
         Authorization: `bearer ${token}`,
         "Content-Type": "application/json",
         Accept: "application/json",
     };
-    if (!token || !(await (await fetch("https://api.cohere.ai/v1/check-api-key", { headers })).json()).valid) {
+
+    if (!token || !(await (await fetch("https://api.cohere.ai/v1/check-api-key", { headers, method: "POST" })).json()).valid) {
         console.error("Invalid API key");
         console.log("Please enter a valid API key and run the script again");
         let key = window.prompt("Enter API key");
         return localStorage.setItem(COHERE_KEY, key);
     }
 
+    let hook = localStorage.getItem(HOOK_KEY);
+    if (!URL.canParse(hook) || new URL(hook).hostname != "discord.com" || !(await fetch(hook)).ok) {
+        console.error("Invalid webhook key");
+        console.log("Please enter a valid Webhook url and run the script again");
+        let key = window.prompt("Enter Webhook URL");
+        return localStorage.setItem(HOOK_KEY, key);
+    }
+
     let history = await promptHistory();
+    console.log("Please wait...");
     if (history.length < 100) return console.log("Too short");
-    let templateSummary = `Summarize this story, dont make anything up. Only use fact provided by the story. Use third person perspective, Make it into multiple paragraphs. Anything inside * or () is OOC, Out of character. Means, the character didnt actually say it.\nFor example *smile* means the character is smiling:`;
+    let templateSummary = `Summarize this story, don't make anything up. Only use fact provided by the story. Use third person perspective, Make it into multiple paragraphs. Don't use more than 4090 characters including whitespaces. Anything inside * or () is OOC, Out of character. Means, the character didnt actually say it.\nFor example *smile* means the character is smiling:`;
     let preamble = "You are ordinary man you happened to like interesting story\n\nYou got a job to summarize a story with the provided requirements without any questions";
 
     let summary = await (
@@ -30,15 +42,44 @@
         })
     ).json();
 
-    console.log(summary.text);
-    console.log("Come back to c.ai to copy the summary");
-    window.addEventListener(
-        "focus",
-        () => {
-            navigator.clipboard.writeText(summary.text).then(() => console.log("copied"));
-        },
-        { once: true }
+    let webhookPayload = new FormData();
+    const blob = new Blob([summary.text], { type: "text/plain" });
+
+    webhookPayload.append(
+        "payload_json",
+        JSON.stringify({
+            embeds: [
+                {
+                    title: `Chat Summary`,
+                    color: 0x98ffbe,
+                    description: summary.text.slice(0, 4090),
+                    footer: {
+                        text: "Cohere AI",
+                        icon_url: "https://raw.githubusercontent.com/mangadi3859/random/main/cai/images/cohere.png",
+                    },
+                    timestamp: new Date().toISOString(),
+                },
+            ],
+            username: "Summary",
+        })
     );
+
+    webhookPayload.append("file[0]", blob, "summary.txt");
+    await fetch(hook, {
+        headers: {
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "cross-site",
+        },
+        referrer: "https://discohook.org/",
+        referrerPolicy: "strict-origin",
+        body: webhookPayload,
+        method: "POST",
+        mode: "cors",
+        credentials: "omit",
+    });
+
+    console.log("Completed");
 
     function promptHistory() {
         return new Promise((resolve, reject) => {
