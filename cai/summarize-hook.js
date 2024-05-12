@@ -16,8 +16,9 @@
         return localStorage.setItem(COHERE_KEY, key);
     }
 
+    let regex = /^(?:(?:https?|ftp|file):\/\/|www\.|ftp\.)(?:\([-A-Z0-9+&@#\/%=~_|$?!:,.]*\)|[-A-Z0-9+&@#\/%=~_|$?!:,.])*(?:\([-A-Z0-9+&@#\/%=~_|$?!:,.]*\)|[A-Z0-9+&@#\/%=~_|$])$/gi;
     let hook = localStorage.getItem(HOOK_KEY);
-    if (!URL.canParse(hook) || new URL(hook).hostname != "discord.com" || !(await fetch(hook)).ok) {
+    if (!regex.test(hook) || new URL(hook).hostname != "discord.com" || !(await fetch(hook)).ok) {
         console.error("Invalid webhook key");
         console.log("Please enter a valid Webhook url and run the script again");
         let key = window.prompt("Enter Webhook URL");
