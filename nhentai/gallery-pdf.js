@@ -16,7 +16,18 @@
 
     let cors = localStorage.getItem(CORS_KEY);
     let regex = /^(?:(?:https?|ftp|file):\/\/|www\.|ftp\.)(?:\([-A-Z0-9+&@#\/%=~_|$?!:,.]*\)|[-A-Z0-9+&@#\/%=~_|$?!:,.])*(?:\([-A-Z0-9+&@#\/%=~_|$?!:,.]*\)|[A-Z0-9+&@#\/%=~_|$])$/gi;
-    if (!regex.test(cors) || new URL(cors).hostname != "justcors.com" || (await fetch(cors).catch(console.dir)).status != 400) {
+
+    try {
+        (await fetch(cors).catch(() => null)).status;
+    } catch (err) {
+        console.error("Invalid Justcors url");
+        console.log("Please enter a valid JustCors url and run the script again");
+        console.log("https://justcors.com");
+        let key = window.prompt("Enter JustCors URL");
+        return localStorage.setItem(CORS_KEY, key);
+    }
+
+    if (!regex.test(cors) || new URL(cors).hostname != "justcors.com") {
         console.error("Invalid Justcors url");
         console.log("Please enter a valid JustCors url and run the script again");
         console.log("https://justcors.com");
