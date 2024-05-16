@@ -67,7 +67,7 @@
     });
 
     function tryToSave() {
-        if (completion < gallery.images.pages.length) return;
+        if (completion < gallery.images.pages.length-1) return;
         let outpdf = doc.output("blob");
         let a = document.createElement("a");
         a.download = `[NHENTAI] ${gallery.title.english} - ${gallery.id}.pdf`;
@@ -92,7 +92,7 @@
         file.readAsDataURL(blob);
     }
 
-    async function queue(arr, callback, chunk = 2) {
+    async function queue(arr, callback, chunk = 4) {
         let queues = [];
         let res = [];
         for (let i = 0; i < arr.length; i += chunk) {
