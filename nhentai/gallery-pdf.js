@@ -42,7 +42,7 @@
     });
 
     for (let i = 1; i < gallery.images.pages.length; i++) {
-        doc.addPage([gallery.images.pages[0].w, gallery.images.pages[0].h], "p");
+        doc.addPage([gallery.images.pages[i].w, gallery.images.pages[i].h], "p");
     }
 
     let completion = 0;
