@@ -112,7 +112,7 @@
         console.log("Done");
     }
 
-    async function queue(arr, callback, chunk = 10) {
+    async function queue(arr, callback, chunk = 20) {
         let queues = [];
         let res = [];
         for (let i = 0; i < arr.length; i += chunk) {
