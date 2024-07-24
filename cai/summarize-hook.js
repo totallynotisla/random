@@ -1,6 +1,7 @@
 (async () => {
     const COHERE_KEY = "cohere-token";
     const HOOK_KEY = "webhook-url";
+    const MAX_PARTS = 3;
 
     let token = localStorage.getItem(COHERE_KEY);
     let headers = {
@@ -28,59 +29,85 @@
     let history = await promptHistory();
     console.log("Please wait...");
     if (history.length < 100) return console.log("Too short");
-    let templateSummary = `Summarize this story, don't make anything up. Only use fact provided by the story. Use third person perspective, Make it into multiple paragraphs. Don't use more than 4090 characters including whitespaces. Anything inside * or () is OOC, Out of character. Means, the character didnt actually say it.\nFor example *smile* means the character is smiling:`;
-    let preamble = "You are ordinary man you happened to like interesting story\n\nYou got a job to summarize a story with the provided requirements without any questions";
 
-    let summary = await (
-        await fetch("https://api.cohere.ai/v1/chat", {
-            body: JSON.stringify({
-                preamble,
-                temperature: 0.2,
-                message: `${templateSummary}\n\n${history}`,
-            }),
-            method: "POST",
-            headers,
-        })
-    ).json();
+    await generateSummary(history, (text, index) => sendWebhook(text, { index: index, multiples: !!index }), { parts: window.confirm(`Multiple Parts? (max ${MAX_PARTS})`) ? 1 : null });
 
-    let webhookPayload = new FormData();
-    const blob = new Blob([summary.text], { type: "text/plain" });
+    async function generateSummary(text, callback, { parts, history = [] } = {}) {
+        const MAX_TOKEN = 4090;
+        let percentage = Math.floor((1 / MAX_PARTS) * 100);
+        let templateSummary = `Summarize the ${
+            !parts ? "" : parts == 1 ? `first ${percentage}% of the` : `next ${percentage}% of the`
+        } story from this document, don't make anything up. Only use fact provided by the story. Use third person perspective, Make it into multiple paragraphs. Don't use more than characters including whitespaces. Anything inside * or () is OOC, Out of character. Means, the character didnt actually say it.\nFor example *smile* means the character is smiling:`;
+        let preamble = "You are an ordinary man. you happened to like an interesting story\n\nYou got a job to summarize a story with the provided requirements without any questions";
 
-    webhookPayload.append(
-        "payload_json",
-        JSON.stringify({
-            embeds: [
-                {
-                    title: `Chat Summary`,
-                    color: 0x98ffbe,
-                    description: summary.text.slice(0, 4090),
-                    footer: {
-                        text: "Cohere AI",
-                        icon_url: "https://raw.githubusercontent.com/mangadi3859/random/main/cai/images/cohere.png",
+        console.log("Request to cohere ai");
+        let docs = [
+            {
+                title: "Story",
+                text,
+            },
+        ];
+        let summary = await (
+            await fetch("https://api.cohere.ai/v1/chat", {
+                body: JSON.stringify({
+                    preamble,
+                    chat_history: history,
+                    documents: docs,
+                    max_tokens: MAX_TOKEN,
+                    temperature: 0.2,
+                    message: `${templateSummary}`,
+                }),
+                method: "POST",
+                headers,
+            })
+        ).json();
+
+        callback(summary.text, parts);
+        if (parts == null || parts == 0 || parts >= MAX_PARTS) return;
+        return await generateSummary(text, callback, { parts: parts + 1, history: summary.chat_history });
+    }
+
+    async function sendWebhook(msg, { multiples = false, index = 0, max = MAX_PARTS } = {}) {
+        let webhookPayload = new FormData();
+        const blob = new Blob([msg], { type: "text/plain" });
+
+        webhookPayload.append(
+            "payload_json",
+            JSON.stringify({
+                embeds: [
+                    {
+                        title: `Chat Summary`,
+                        color: 0x98ffbe,
+                        author: { name: multiples ? `Part (${index}/${max})` : "" },
+                        description: msg.slice(0, 4090),
+                        footer: {
+                            text: "Cohere AI",
+                            icon_url: "https://raw.githubusercontent.com/mangadi3859/random/main/cai/images/cohere.png",
+                        },
+                        timestamp: new Date().toISOString(),
                     },
-                    timestamp: new Date().toISOString(),
-                },
-            ],
-            username: "Summary",
-        })
-    );
+                ],
+                username: "Summary",
+            })
+        );
 
-    webhookPayload.append("file[0]", blob, "summary.txt");
-    await fetch(hook, {
-        headers: {
-            "sec-fetch-dest": "empty",
-            "sec-fetch-mode": "cors",
-            "sec-fetch-site": "cross-site",
-        },
-        referrer: "https://discohook.org/",
-        referrerPolicy: "strict-origin",
-        body: webhookPayload,
-        method: "POST",
-        mode: "cors",
-        credentials: "omit",
-    });
+        webhookPayload.append("file[0]", blob, `summary${multiples ? `-part-${index}` : ""}.txt`);
+        await fetch(hook, {
+            headers: {
+                "sec-fetch-dest": "empty",
+                "sec-fetch-mode": "cors",
+                "sec-fetch-site": "cross-site",
+            },
+            referrer: "https://discohook.org/",
+            referrerPolicy: "strict-origin",
+            body: webhookPayload,
+            method: "POST",
+            mode: "cors",
+            credentials: "omit",
+        });
 
-    console.log("Completed");
+        console.log("Completed");
+    }
 
     function promptHistory() {
         return new Promise((resolve, reject) => {
