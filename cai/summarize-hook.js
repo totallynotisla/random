@@ -35,9 +35,9 @@
     async function generateSummary(text, callback, { parts, history = [] } = {}) {
         const MAX_TOKEN = 4090;
         let percentage = Math.floor((1 / MAX_PARTS) * 100);
-        let templateSummary = `Summarize the ${
-            !parts ? "" : parts == 1 ? `first ${percentage}% of the` : `next ${percentage}% of the`
-        } story from this document, don't make anything up. Only use fact provided by the story. Use third person perspective, Make it into multiple paragraphs. Anything inside * or () is OOC, Out of character. Means, the character didnt actually say it.\nFor example *smile* means the character is smiling:`;
+        let templateSummary = `Summarize the ${!parts ? "" : parts == 1 ? `first ${percentage}% of the` : `next ${percentage}% of the`} story from this document, ${
+            parts > 1 ? "START AFTER THE LAST SUMMARY DON'T REPEAT PREVIOUS SUMMARY" : ""
+        } don't make anything up. Only use fact provided by the story. Use third person perspective, Make it into multiple paragraphs. Anything inside * or () is OOC, Out of character. Means, the character didnt actually say it.\nFor example *smile* means the character is smiling:`;
         let preamble = "You are an ordinary man. you happened to like an interesting story\n\nYou got a job to summarize a story with the provided requirements without any questions";
 
         console.log("Request to cohere ai");
