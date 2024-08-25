@@ -1,0 +1,34 @@
+.cait_addons {
+    display: none;
+    z-index: 999;
+    position: fixed;
+    top: 0px;
+    bottom: 0px;
+    right: 0px;
+    left: 0px;
+    background-color: rgba(0, 0, 0, 0.376);
+    align-items: center;
+    justify-content: center;
+
+    & .x-svg {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        cursor: pointer;
+        border-radius: 50px;
+    }
+}
+
+.cait_addons.active {
+    display: flex;
+}
+
+.cait_addons-body {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 10px 14px;
+}
