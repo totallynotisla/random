@@ -2,7 +2,7 @@
     const COHERE_KEY = "cohere-token";
     const HOOK_KEY = "webhook-url";
     const MAX_PARTS = 3;
-
+    //ss
     let token = localStorage.getItem(COHERE_KEY);
     let headers = {
         Authorization: `bearer ${token}`,
