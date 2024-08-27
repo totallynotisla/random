@@ -167,7 +167,7 @@ async function main() {
                 webhookBtn.innerText = "Sending webhook...";
                 webhookBtn.disabled = true;
                 for (let data of summaries) {
-                    sendWebhook(data.text, { index: data.index, max: MAX_PARTS, multiples: parts });
+                    await sendWebhook(data.text, { index: data.index, max: MAX_PARTS, multiples: parts });
                 }
 
                 //Clean up
