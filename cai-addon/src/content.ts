@@ -1,5 +1,7 @@
-import { getHook, HOOK_KEY, saveHook, validateHook } from "./tools/webhook";
-import { getToken, saveToken, validateToken } from "./tools/cohere";
+import { getHook, HOOK_KEY, saveHook, sendWebhook, validateHook } from "./tools/webhook";
+import { generateSummary, getToken, MAX_PARTS, saveToken, validateToken } from "./tools/cohere";
+import { fetchHistory, getRecent } from "./tools/cai";
+import { formatHistoryResult, getCharID } from "./tools/utils";
 
 const caiTools = <HTMLDivElement>document.querySelector(".cai_tools");
 const cBody = <HTMLDivElement>document.querySelector(".cait-body");
@@ -21,6 +23,7 @@ async function main() {
     cohereBtn.innerText = "Cohere";
     sumBtn.innerText = "Summarize";
 
+    //Webhook
     hookModal.classList.add("cait_addons");
     hookModal.dataset["tool"] = "cai_tools";
     hookModal.innerHTML = `
@@ -65,6 +68,7 @@ async function main() {
 `;
     }
 
+    //Cohere
     cohereModal.classList.add("cait_addons");
     cohereModal.dataset["tool"] = "cai_tools";
     cohereModal.innerHTML = `
@@ -101,10 +105,108 @@ async function main() {
         let hookBody = cohereModal.querySelector(".cait_addons-body");
         if (!hookBody) return;
         hookBody.innerHTML = `
-        <label for="caitHookInput">Cohere API Key</label>
+        <label for="caitCohereInput">Cohere API Key</label>
         <textarea id="caitCohereInput" class="text-input" data-cait="cohereInput" style="width:100%;resize:vertical;" row="5">${getToken()}</textarea>
         <div style="${(await validateToken()) ? "display:none;" : ""} color: var(--btn-danger);">Invalid cohere ai TOKEN</div>
-        
+`;
+    }
+
+    //Summary
+    summaryModal.classList.add("cait_addons");
+    summaryModal.dataset["tool"] = "cai_tools";
+    summaryModal.innerHTML = `
+<div class="cait_addons-cont">
+    <div class="cait_addons-header">
+        <h3>Summary</h3><span class="x-svg"></span>
+    </div>
+    <div class="cait_addons-body" style="display: flex;gap:.5rem;flex-direction:column;">
+    </div>
+    <div style="justify-content: start; gap: 1rem;" class="cait_addons-footer">
+        <button id="caitSumSubmit" style="background-color: var(--btn-primary);" class="btn">Generate</button>
+        <button id="caitSendHook" style="display: none;background-color: var(--btn-primary);" class="btn">Send Webhook</button>
+    </div>
+</div>`;
+
+    sumBtn.addEventListener("click", openSumModal);
+    summaryModal.querySelector(".x-svg")?.addEventListener("click", closeSumModal);
+    summaryModal.addEventListener("click", (e) => e.target == summaryModal && closeSumModal());
+    summaryModal.querySelector("#caitSumSubmit")?.addEventListener("click", async (e) => {
+        // closeSumModal();
+        let submitBtn = <HTMLButtonElement>e.target;
+        let webhookBtn = <HTMLButtonElement>document.querySelector("#caitSendHook");
+        let hookBody = <HTMLDivElement>summaryModal.querySelector(".cait_addons-body");
+        submitBtn.disabled = true;
+
+        submitBtn.innerText = "Fetching chat data...";
+        let charId = <string>getCharID();
+        let chatInfo = await getRecent(charId);
+
+        submitBtn.innerText = "Fetching turns...";
+        let limit = (<HTMLInputElement>hookBody.querySelector("#caitFetchAllInput")).checked;
+        let history = await fetchHistory(chatInfo.chats[0].chat_id, limit);
+
+        submitBtn.innerText = "Generating Summaries...";
+        let parts = (<HTMLInputElement>hookBody.querySelector("#caitMultipleInput")).checked;
+        let summaries = await generateSummary(formatHistoryResult(history), { parts: parts ? 1 : 0 }, (i) => {
+            if (!limit) return;
+            submitBtn.innerText = `Generating Summaries... (${i}/${MAX_PARTS})`;
+        });
+
+        submitBtn.innerText = "Done";
+        hookBody.innerHTML =
+            hookBody.innerHTML +
+            `
+            <label>Result</label>
+            <p class="text-input" style="height:10rem;padding-block:.5rem;">${summaries.map((e) => e.text).join("<br/><br/>")}</p>
+        `;
+
+        webhookBtn.style.display = "block";
+        webhookBtn.addEventListener(
+            "click",
+            async (e) => {
+                webhookBtn.innerText = "Sending webhook...";
+                webhookBtn.disabled = true;
+                for (let data of summaries) {
+                    sendWebhook(data.text, { index: data.index, max: MAX_PARTS, multiples: parts });
+                }
+
+                //Clean up
+                webhookBtn.style.display = "none";
+                submitBtn.innerText = "Generate";
+                webhookBtn.innerText = "Send Webhook";
+                submitBtn.disabled = false;
+                webhookBtn.disabled = false;
+                closeSumModal();
+            },
+            { once: true }
+        );
+    });
+
+    document.body.append(summaryModal);
+    function closeSumModal() {
+        summaryModal.classList.remove("active");
+    }
+
+    async function openSumModal() {
+        closeTools();
+        let btn = <HTMLButtonElement>summaryModal.querySelector("#caitSumSubmit");
+        let tokenValid = await validateToken();
+        if (!tokenValid) btn.classList.add("disabled");
+        btn.disabled = !tokenValid;
+
+        summaryModal.classList.add("active");
+        let hookBody = summaryModal.querySelector(".cait_addons-body");
+        if (!hookBody) return;
+        hookBody.innerHTML = `
+        <div style="display:flex;align-items:center;gap:.5rem;">
+            <label class="normal" for="caitFetchAllInput">Fetch all message</label>
+            <input type="checkbox" id="caitFetchAllInput" data-cait="summaryInput" />
+        </div>
+        <div style="display:flex;align-items:center;gap:.5rem;">
+            <label class="normal" for="caitMultipleInput">Multiple Summaries</label>
+            <input type="checkbox" id="caitMultipleInput" data-cait="summaryInput" />
+        </div>
+        <div style="${tokenValid ? "display:none;" : ""} color: var(--btn-danger);">Invalid cohere ai TOKEN</div>        
 `;
     }
 

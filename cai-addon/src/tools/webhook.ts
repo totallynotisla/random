@@ -1,4 +1,5 @@
 import { Chats } from "./cai";
+import { MAX_PARTS } from "./cohere";
 
 export const HOOK_KEY = "webhook-url";
 
@@ -23,36 +24,35 @@ export function getHook() {
     return localStorage.getItem(HOOK_KEY);
 }
 
-export async function sendSummaryData(summaries: string[], chatData: Chats) {
+export async function sendWebhook(msg: string, { multiples = false, index = 0, max = MAX_PARTS } = {}) {
     let webhookPayload = new FormData();
-    const blob = new Blob([summaries.join("\n\n")], { type: "text/plain" });
+    const blob = new Blob([msg], { type: "text/plain" });
     let hook = getHook();
-    if (!hook) throw new Error("Invalid webhook url!");
+
+    if (!hook) throw new Error("Webhook url didn't exist");
 
     webhookPayload.append(
         "payload_json",
         JSON.stringify({
             embeds: [
                 {
-                    title: `Chat history [${chatData.chats[0].chat_id}]`,
-                    color: 0xae98ff,
-                    author: {
-                        name: chatData.chats[0].character_name,
-                        icon_url: `https://characterai.io/i/80/static/avatars/${chatData.chats[0].character_avatar_uri}`,
-                    },
+                    title: `Chat Summary`,
+                    color: 0x98ffbe,
+                    author: { name: multiples ? `Part (${index}/${max})` : "" },
+                    description: msg.slice(0, 4090),
                     footer: {
-                        text: "Character AI",
-                        icon_url: "https://raw.githubusercontent.com/mangadi3859/random/main/cai/images/cai.jpeg",
+                        text: "Cohere AI",
+                        icon_url: "https://raw.githubusercontent.com/mangadi3859/random/main/cai/images/cohere.png",
                     },
                     timestamp: new Date().toISOString(),
                 },
             ],
-            username: "History",
+            username: "Summary",
         })
     );
 
-    webhookPayload.append("file[0]", blob, "history.txt");
-    let res = await fetch(hook, {
+    webhookPayload.append("file[0]", blob, `summary${multiples ? `-part-${index}` : ""}.txt`);
+    await fetch(hook, {
         headers: {
             "sec-fetch-dest": "empty",
             "sec-fetch-mode": "cors",
@@ -66,5 +66,5 @@ export async function sendSummaryData(summaries: string[], chatData: Chats) {
         credentials: "omit",
     });
 
-    return res;
+    console.log("Completed");
 }

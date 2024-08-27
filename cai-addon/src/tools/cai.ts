@@ -1,4 +1,4 @@
-import { getCAIToken } from "./utils";
+import { getCAIToken, formatHistory } from "./utils";
 
 export interface IChat {
     chat_id: string;
@@ -57,18 +57,25 @@ interface IMeta {
     next_token: string;
 }
 
-const CAI_OPT = {
+const CAI_OPT = () => ({
     headers: {
         Authorization: getCAIToken() || "",
     },
-};
+});
 
 export async function getRecent(charID: string): Promise<Chats> {
-    const chatInfo = await (await fetch(`https://neo.character.ai/chats/recent/${charID}`, CAI_OPT)).json();
+    const chatInfo = await (await fetch(`https://neo.character.ai/chats/recent/${charID}`, CAI_OPT())).json();
     return chatInfo;
 }
 
-export async function getTurn(chatID: string, nextToken?: string): Promise<Chats> {
-    const recentHistory = await (await fetch(`https://neo.character.ai/turns/${chatID}?next_token=${nextToken}`, CAI_OPT)).json();
+export async function getTurn(chatID: string, nextToken?: string): Promise<ITurnsResponse> {
+    const recentHistory = await (await fetch(`https://neo.character.ai/turns/${chatID}?next_token=${nextToken}`, CAI_OPT())).json();
     return recentHistory;
+}
+
+export async function fetchHistory(chatId: string, all: boolean = false, history: string[] = [], nextToken?: string): Promise<string[]> {
+    let chat = await getTurn(chatId, nextToken);
+    history.push(...formatHistory(chat.turns));
+    if (all && chat.meta.next_token) return fetchHistory(chatId, all, history, chat.meta.next_token);
+    return history;
 }

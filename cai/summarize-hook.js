@@ -62,6 +62,8 @@
             })
         ).json();
 
+        console.log(summary);
+
         callback(summary.text, parts);
         if (parts == null || parts == 0 || parts >= MAX_PARTS) return;
         return await generateSummary(text, callback, { parts: parts + 1, history: summary.chat_history });
