@@ -124,6 +124,8 @@ async function main() {
     <div style="justify-content: start; gap: 1rem;" class="cait_addons-footer">
         <button id="caitSumSubmit" style="background-color: var(--btn-primary);" class="btn">Generate</button>
         <button id="caitSendHook" style="display: none;background-color: var(--btn-primary);" class="btn">Send Webhook</button>
+        <button id="caitCopySum" style="display: none;background-color: var(--btn-primary);" class="btn">Copy</button>
+        <button id="caitDoneSum" style="display: none;background-color: var(--btn-primary);" class="btn">Done</button>
     </div>
 </div>`;
 
@@ -134,6 +136,8 @@ async function main() {
         // closeSumModal();
         let submitBtn = <HTMLButtonElement>e.target;
         let webhookBtn = <HTMLButtonElement>document.querySelector("#caitSendHook");
+        let doneSumBtn = <HTMLButtonElement>document.querySelector("#caitDoneSum");
+        let copySumBtn = <HTMLButtonElement>document.querySelector("#caitCopySum");
         let hookBody = <HTMLDivElement>summaryModal.querySelector(".cait_addons-body");
         submitBtn.disabled = true;
 
@@ -152,7 +156,6 @@ async function main() {
             submitBtn.innerText = `Generating Summaries... (${i}/${MAX_PARTS})`;
         });
 
-        submitBtn.innerText = "Done";
         hookBody.innerHTML =
             hookBody.innerHTML +
             `
@@ -160,7 +163,30 @@ async function main() {
             <p class="text-input" style="height:10rem;padding-block:.5rem;">${summaries.map((e) => e.text).join("<br/><br/>")}</p>
         `;
 
+        submitBtn.disabled = true;
+        submitBtn.innerText = "completed...";
         webhookBtn.style.display = "block";
+        copySumBtn.style.display = "block";
+        doneSumBtn.style.display = "block";
+
+        doneSumBtn.addEventListener(
+            "click",
+            async (e) => {
+                cleanUp();
+                closeSumModal();
+            },
+            { once: true }
+        );
+        copySumBtn.addEventListener("click", copyToClipboard, { once: true });
+        async function copyToClipboard(e: MouseEvent) {
+            await navigator.clipboard.writeText(summaries.map((e) => e.text).join("\n\n"));
+            copySumBtn.disabled = true;
+            copySumBtn.innerText = "Copied...";
+            setTimeout(() => {
+                copySumBtn.innerText = "Copy";
+                copySumBtn.disabled = false;
+            }, 3000);
+        }
         webhookBtn.addEventListener(
             "click",
             async (e) => {
@@ -171,15 +197,24 @@ async function main() {
                 }
 
                 //Clean up
-                webhookBtn.style.display = "none";
-                submitBtn.innerText = "Generate";
-                webhookBtn.innerText = "Send Webhook";
-                submitBtn.disabled = false;
-                webhookBtn.disabled = false;
+                cleanUp();
                 closeSumModal();
             },
             { once: true }
         );
+
+        function cleanUp() {
+            webhookBtn.style.display = "none";
+            doneSumBtn.style.display = "none";
+            copySumBtn.style.display = "none";
+
+            submitBtn.innerText = "Generate";
+            webhookBtn.innerText = "Send Webhook";
+            submitBtn.disabled = false;
+            webhookBtn.disabled = false;
+
+            copySumBtn.removeEventListener("click", copyToClipboard);
+        }
     });
 
     document.body.append(summaryModal);
