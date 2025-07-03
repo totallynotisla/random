@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@types/node": "^24.0.10",
+    "fs-extra": "^11.3.0",
+    "puppeteer": "^24.11.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
+}
