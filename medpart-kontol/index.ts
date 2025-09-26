@@ -8,9 +8,48 @@ config();
 const IG_USERNAME = process.env.IG_USERNAME || "";
 const IG_PASSWORD = process.env.IG_PASSWORD || "";
 const SESSION_FILE = "temp-session.json";
+const LIKE_COUNT = parseInt(process.env.LIKE_COUNT || "5", 10);
 
 async function delay(ms: number) {
 	return new Promise((res) => setTimeout(res, ms));
+}
+
+async function collectPostLinks(page: Page, username: string, limit: number) {
+	// Make sure the grid is present
+	await page.waitForSelector("main", { timeout: 10_000 });
+
+	let lastHeight = await page.evaluate(() => document.body.scrollHeight);
+
+	// Keep scrolling until we have enough links or no more content appears
+	while (true) {
+		// Scroll to bottom
+		await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+
+		// Give the network/UI a moment to load more items
+		try {
+			await page.waitForFunction((prev) => document.body.scrollHeight > prev, { timeout: 2500 }, lastHeight);
+			lastHeight = await page.evaluate(() => document.body.scrollHeight);
+		} catch {
+			// No further increase in height → probably no more posts
+		}
+
+		// Check how many post anchors we have so far
+		const count = await page.$$eval(`a[href^="/${username}/p/"]`, (els) => els.length);
+		if (count >= limit) break;
+
+		// If height didn't grow and we still don't have enough posts, bail out
+		const grew = await page.evaluate((prev) => document.body.scrollHeight > prev, lastHeight);
+		if (!grew) break;
+	}
+
+	// Now safely collect the first `limit` links
+	const links = await page.$$eval(
+		`a[href^="/${username}/p/"]`,
+		(els, likeCount) => els.slice(0, likeCount as number).map((a) => (a as HTMLAnchorElement).href),
+		limit
+	);
+
+	return links;
 }
 
 async function likePost(postLinks: string[], handle: string, page: Page, folder: string, length: number, i: number = 0) {
@@ -105,6 +144,11 @@ async function processHandle(browser: Browser, handle: string) {
 		for (const btn of buttons) {
 			const text = await page.evaluate((el) => el.textContent?.trim(), btn);
 			if (text.toLowerCase().includes("follow")) {
+				if (text.toLowerCase().includes("following")) {
+					console.log(`Already following ${handle}.`);
+					break;
+				}
+
 				console.log(`Following ${handle}...`);
 				await btn.click();
 				// await delay(3000);
@@ -115,7 +159,13 @@ async function processHandle(browser: Browser, handle: string) {
 		await page.screenshot({ path: `${folder}/profile.png` });
 
 		// Like first 5 posts and screenshot them
-		const postLinks = await page.$$eval(`a[href^="/${username}/p/"]`, (els) => els.slice(0, 5).map((a) => (a as HTMLAnchorElement).href));
+		const postLinks = await collectPostLinks(page, username, LIKE_COUNT);
+
+		// await page.$$eval(
+		// 	`a[href^="/${username}/p/"]`,
+		// 	(els, count) => els.slice(0, count).map((a) => (a as HTMLAnchorElement).href),
+		// 	LIKE_COUNT
+		// );
 		// console.log(`Found ${postLinks.length} posts for ${handle}.`);
 
 		await likePost(postLinks, handle, page, folder, postLinks.length);
